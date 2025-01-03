@@ -1,0 +1,33 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
+}
+
+enum Status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model TabSummary {
+  id           String   @id @default(cuid())
+  url          String
+  title        String
+  type         String
+  rawContent   String   @db.Text
+  summary      String?  @db.Text
+  keyPoints    String?  @db.Text
+  tags         String[]
+  status       Status   @default(PENDING)
+  processedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
