@@ -3,6 +3,7 @@ import express from "express";
 import prisma from "../db.js";
 import { startProcessing } from "../workers/summaryWorker.js";
 import { classifyContent } from "../utils/contentClassifier.js";
+import { summaryQueue } from "../utils/queue.js";
 
 const router = express.Router();
 
@@ -71,19 +72,23 @@ router.post("/", async (req, res) => {
 
 router.get("/status", async (req, res) => {
   try {
-    // Use Promise.all for concurrent queries
+    // Get queue status
     const [
       totalCount,
       pendingCount,
       processingCount,
       completedCount,
       failedCount,
+      queueCount,
+      activeCount,
     ] = await Promise.all([
       prisma.tabSummary.count(),
       prisma.tabSummary.count({ where: { status: "PENDING" } }),
       prisma.tabSummary.count({ where: { status: "PROCESSING" } }),
       prisma.tabSummary.count({ where: { status: "COMPLETED" } }),
       prisma.tabSummary.count({ where: { status: "FAILED" } }),
+      summaryQueue.getWaitingCount(),
+      summaryQueue.getActiveCount(),
     ]);
 
     const counts = {
@@ -92,14 +97,23 @@ router.get("/status", async (req, res) => {
       processing: processingCount,
       completed: completedCount,
       failed: failedCount,
+      queued: queueCount,
+      active: activeCount,
     };
 
-    const ready = pendingCount === 0 && processingCount === 0 && totalCount > 0;
+    const ready =
+      pendingCount === 0 &&
+      processingCount === 0 &&
+      queueCount === 0 &&
+      activeCount === 0 &&
+      totalCount > 0;
 
     let message = "No summaries to process";
     if (totalCount > 0) {
       if (!ready) {
-        message = `Generating summaries (${completedCount}/${totalCount} completed)`;
+        const inProgress = processingCount + activeCount;
+        const waiting = pendingCount + queueCount;
+        message = `Processing summaries (${completedCount} completed, ${inProgress} in progress, ${waiting} waiting)`;
       } else {
         message = "All summaries are ready";
       }

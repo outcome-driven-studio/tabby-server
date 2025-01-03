@@ -13,6 +13,15 @@ app.set("trust proxy", true);
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
 // Routes
 app.use("/api/summaries", summaryRouter);
 app.use("/api/newsletter", newsletterRouter);

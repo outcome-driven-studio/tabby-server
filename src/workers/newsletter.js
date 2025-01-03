@@ -2,7 +2,9 @@
 import sgMail from "@sendgrid/mail";
 import prisma from "../db.js";
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 export async function generateAndSendNewsletter() {
   try {
@@ -12,6 +14,7 @@ export async function generateAndSendNewsletter() {
     const summaries = await prisma.$transaction(async (tx) => {
       const results = await tx.tabSummary.findMany({
         where: {
+          status: "COMPLETED",
           createdAt: {
             gte: weekAgo,
           },
@@ -30,10 +33,28 @@ export async function generateAndSendNewsletter() {
     }
 
     const newsletter = formatNewsletter(summaries);
-    await Promise.all([
-      sendToSlack(newsletter.slack),
-      sendEmail(newsletter.email),
-    ]);
+
+    // Always try to send to Slack
+    await sendToSlack(newsletter.slack);
+
+    // Only try to send email if configured
+    if (
+      process.env.SENDGRID_API_KEY &&
+      process.env.NOTIFICATION_EMAIL &&
+      process.env.FROM_EMAIL
+    ) {
+      try {
+        await sendEmail(newsletter.email);
+        console.log("Email sent successfully");
+      } catch (error) {
+        console.error("Error sending email:", error);
+        // Don't throw error, just log it
+      }
+    } else {
+      console.log("Email sending skipped - missing configuration");
+    }
+
+    return { success: true, message: "Newsletter sent successfully" };
   } catch (error) {
     console.error("Error generating newsletter:", error);
     throw error;

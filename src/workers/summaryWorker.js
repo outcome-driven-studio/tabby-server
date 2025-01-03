@@ -1,12 +1,25 @@
-import prisma from "../db.js";
+// src/workers/summaryWorker.js
 import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { LLMChain } from "langchain/chains";
+import prisma from "../db.js";
 
 let processingQueue = [];
 let isProcessing = false;
+let llm = null;
+
+function initializeLLM() {
+  if (!llm) {
+    llm = new ChatOpenAI({
+      openAIApiKey: process.env.OPENAI_API_KEY,
+      temperature: 0.7,
+      maxTokens: 500,
+    });
+  }
+}
 
 export async function startProcessing(summaryId) {
+  console.log(`Adding summary ${summaryId} to processing queue`);
   processingQueue.push(summaryId);
   if (!isProcessing) {
     processNext();
@@ -23,12 +36,15 @@ async function processNext() {
   const summaryId = processingQueue.shift();
 
   try {
+    console.log(`Processing summary ${summaryId}`);
+
     // Get the summary data
     const summary = await prisma.tabSummary.findUnique({
       where: { id: summaryId },
     });
 
     if (!summary || summary.status !== "PENDING") {
+      console.log(`Skipping summary ${summaryId}: Invalid status or not found`);
       processNext();
       return;
     }
@@ -39,17 +55,14 @@ async function processNext() {
       data: { status: "PROCESSING" },
     });
 
-    // Initialize LangChain
-    const llm = new ChatOpenAI({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      temperature: 0.7,
-    });
+    // Initialize LLM if needed
+    initializeLLM();
 
-    // Generate summary
+    // Generate content
     const [summaryText, keyPoints, tags] = await Promise.all([
-      generateSummary(llm, summary.rawContent, summary.type),
-      generateKeyPoints(llm, summary.rawContent),
-      generateTags(llm, summary.rawContent),
+      generateSummary(summary.rawContent, summary.type),
+      generateKeyPoints(summary.rawContent),
+      generateTags(summary.rawContent),
     ]);
 
     // Update the record
@@ -63,6 +76,8 @@ async function processNext() {
         processedAt: new Date(),
       },
     });
+
+    console.log(`Successfully processed summary ${summaryId}`);
   } catch (error) {
     console.error(`Error processing summary ${summaryId}:`, error);
 
@@ -80,46 +95,76 @@ async function processNext() {
   processNext();
 }
 
-async function generateSummary(llm, content, type) {
-  const template = `Summarize this ${type} content in 2-3 clear and informative sentences:
-  
-  Content: {content}
-  
-  Summary:`;
+async function generateSummary(content, type) {
+  const templates = {
+    article: `Summarize this article in 2-3 informative sentences that capture the main points:
+        
+        ARTICLE:
+        {content}
+        
+        SUMMARY:`,
 
+    tweet: `Provide a clear, one-sentence summary of this tweet's key message:
+        
+        TWEET:
+        {content}
+        
+        SUMMARY:`,
+
+    linkedin_post: `Summarize this LinkedIn post in 1-2 professional sentences:
+        
+        POST:
+        {content}
+        
+        SUMMARY:`,
+
+    youtube_video: `Provide a 2-3 sentence summary of this video's content:
+        
+        VIDEO CONTENT:
+        {content}
+        
+        SUMMARY:`,
+  };
+
+  const template = templates[type] || templates.article;
   const chain = new LLMChain({
     llm,
-    prompt: new PromptTemplate({
-      template,
-      inputVariables: ["content"],
-    }),
+    prompt: PromptTemplate.fromTemplate(template),
   });
 
   const result = await chain.call({ content });
   return result.text.trim();
 }
 
-async function generateKeyPoints(llm, content) {
+async function generateKeyPoints(content) {
   const chain = new LLMChain({
     llm,
-    prompt: new PromptTemplate({
-      template: "Extract 3-5 key points from this content: {content}",
-      inputVariables: ["content"],
-    }),
+    prompt: PromptTemplate.fromTemplate(
+      `Extract 3-5 key points from this content, formatted as bullet points:
+            
+            CONTENT:
+            {content}
+            
+            KEY POINTS:`
+    ),
   });
 
   const result = await chain.call({ content });
   return result.text.trim();
 }
 
-async function generateTags(llm, content) {
+async function generateTags(content) {
   const chain = new LLMChain({
     llm,
-    prompt: new PromptTemplate({
-      template:
-        "Generate 3-5 relevant tags for this content, separated by commas: {content}",
-      inputVariables: ["content"],
-    }),
+    prompt: PromptTemplate.fromTemplate(
+      `Generate 3-5 relevant tags or topics for this content. 
+            Tags should be single words or short phrases, separated by commas.
+            
+            CONTENT:
+            {content}
+            
+            TAGS:`
+    ),
   });
 
   const result = await chain.call({ content });
