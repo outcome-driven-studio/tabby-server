@@ -31,3 +31,35 @@ model TabSummary {
   @@index([createdAt])
   @@index([status])
 }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  picture   String?
+  lastLogin DateTime @default(now())
+  preferences UserPreferences?
+  summaries   Summary[]
+}
+
+model UserPreferences {
+  id                 String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  contentTypes      String[]
+  automationEnabled Boolean  @default(false)
+  automationFrequency Int    @default(1)
+}
+
+model Summary {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  url       String   @unique
+  title     String
+  type      String
+  content   String   @db.Text
+  keyPoints String?  @db.Text
+  tags      String[]
+  createdAt DateTime @default(now())
+}

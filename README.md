@@ -17,6 +17,7 @@ Before you begin, ensure you have the following installed:
 
 - [Node.js](https://nodejs.org/) (v18 or higher)
 - [PostgreSQL](https://www.postgresql.org/)
+- [Redis](https://redis.io/) (v6 or higher)
 - [npm](https://www.npmjs.com/) (comes with Node.js)
 
 ## 🔑 Environment Variables
@@ -25,6 +26,7 @@ Create a `.env` file in the root directory with the following variables:
 
 ```
 DATABASE_URL="postgresql://username:password@localhost:5432/tabby"
+REDIS_URL="redis://localhost:6379"
 OPENAI_API_KEY="your-openai-api-key"
 SENDGRID_API_KEY="your-sendgrid-api-key"
 FROM_EMAIL="your-verified-sender@example.com"
@@ -138,6 +140,7 @@ docker run -d --name tabby-server -p 3000:3000 tabby-server
 
 - **Framework**: Express.js
 - **Database**: PostgreSQL with Prisma ORM
+- **Queue System**: BullMQ with Redis
 - **AI**: OpenAI GPT via LangChain
 - **Deployment**: Fly.io
 - **Notifications**: SendGrid (email) & Slack

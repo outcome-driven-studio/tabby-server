@@ -23,6 +23,8 @@ app.get("/health", (req, res) => {
 });
 
 // Routes
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/preferences", require("./routes/preferences"));
 app.use("/api/summaries", summaryRouter);
 app.use("/api/newsletter", newsletterRouter);
 
