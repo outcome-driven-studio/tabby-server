@@ -1,6 +1,8 @@
 // src/routes/newsletter.js
 import express from "express";
 import { generateAndSendNewsletter } from "../workers/newsletter.js";
+import { formatNewsletter } from "../workers/newsletter.js";
+import prisma from "../db.js";
 
 const router = express.Router();
 

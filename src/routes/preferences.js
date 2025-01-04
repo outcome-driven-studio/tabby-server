@@ -6,20 +6,29 @@ const router = express.Router();
 router.patch("/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    const { contentTypes, automation } = req.body;
+    const { contentTypes, automation = { enabled: false, frequency: 1 } } =
+      req.body;
+
+    // Validate required fields
+    if (!contentTypes || !Array.isArray(contentTypes)) {
+      return res.status(400).json({
+        error: "Invalid request",
+        details: "contentTypes must be an array",
+      });
+    }
 
     const preferences = await prisma.userPreferences.upsert({
       where: { userId },
       update: {
         contentTypes,
-        automationEnabled: automation.enabled,
-        automationFrequency: automation.frequency,
+        automationEnabled: automation?.enabled ?? false,
+        automationFrequency: automation?.frequency ?? 1,
       },
       create: {
         userId,
         contentTypes,
-        automationEnabled: automation.enabled,
-        automationFrequency: automation.frequency,
+        automationEnabled: automation?.enabled ?? false,
+        automationFrequency: automation?.frequency ?? 1,
       },
     });
 

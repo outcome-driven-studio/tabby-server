@@ -1,6 +1,6 @@
 // src/routes/queue.js
 import express from "express";
-import { summaryQueue } from "../config/queue.js";
+import { summaryQueue } from "../utils/queue.js";
 
 const router = express.Router();
 

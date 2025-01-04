@@ -6,7 +6,7 @@ if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
-export async function generateAndSendNewsletter() {
+async function generateAndSendNewsletter() {
   try {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
@@ -135,3 +135,5 @@ async function sendEmail(content) {
     throw error;
   }
 }
+
+export { generateAndSendNewsletter, formatNewsletter };

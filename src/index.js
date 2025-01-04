@@ -6,6 +6,7 @@ import { router as summaryRouter } from "./routes/summaries.js";
 import { router as newsletterRouter } from "./routes/newsletter.js";
 import { router as authRouter } from "./routes/auth.js";
 import { router as preferencesRouter } from "./routes/preferences.js";
+import { router as queueRouter } from "./routes/queue.js";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/preferences", preferencesRouter);
 app.use("/api/summaries", summaryRouter);
 app.use("/api/newsletter", newsletterRouter);
+app.use("/api/queue", queueRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
