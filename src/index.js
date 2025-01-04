@@ -10,6 +10,7 @@ import { router as queueRouter } from "./routes/queue.js";
 import { authMiddleware } from "./middleware/auth.js";
 
 const app = express();
+const port = process.env.PORT || 3000;
 
 // Trust proxy - required for fly.io
 app.set("trust proxy", true);
@@ -42,8 +43,25 @@ app.use((err, req, res, next) => {
   });
 });
 
-const port = process.env.PORT || 3000;
+// Start server
+app
+  .listen(port, "0.0.0.0", () => {
+    console.log(`Server is running on http://0.0.0.0:${port}`);
+  })
+  .on("error", (err) => {
+    console.error("Server failed to start:", err);
+    process.exit(1);
+  });
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Server running on port ${port}`);
+// Handle graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully");
+  prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received, shutting down gracefully");
+  prisma.$disconnect();
+  process.exit(0);
 });

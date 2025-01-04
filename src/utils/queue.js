@@ -1,39 +1,45 @@
 import Queue from "bull";
 import Redis from "ioredis";
 
-const REDIS_URL = process.env.UPSTASH_REDIS_URL;
+const REDIS_URL = process.env.REDIS_URL;
 
 if (!REDIS_URL) {
-  console.error("Redis connection URL is not defined");
+  console.error("Redis URL is not defined");
   process.exit(1);
 }
 
-// Create Redis client with custom configuration
-const redisClient = new Redis(REDIS_URL, {
-  tls: { rejectUnauthorized: false },
+// Create a single Redis client instance
+const client = new Redis(REDIS_URL, {
   maxRetriesPerRequest: 3,
+  enableReadyCheck: false,
   retryStrategy(times) {
+    console.log(`Retry attempt ${times}`);
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
-  reconnectOnError(err) {
-    const targetError = "READONLY";
-    return err.message.includes(targetError);
-  },
+  tls: { rejectUnauthorized: false },
 });
 
-// Create Bull queue with custom Redis client
+// Create Bull queue using the Redis client
 export const summaryQueue = new Queue("summary-processing", {
   createClient: (type) => {
     switch (type) {
       case "client":
-        return redisClient;
+        return client;
       case "subscriber":
-        return redisClient.duplicate();
+        return new Redis(REDIS_URL, {
+          maxRetriesPerRequest: 3,
+          enableReadyCheck: false,
+          tls: { rejectUnauthorized: false },
+        });
       case "bclient":
-        return redisClient.duplicate();
+        return new Redis(REDIS_URL, {
+          maxRetriesPerRequest: 3,
+          enableReadyCheck: false,
+          tls: { rejectUnauthorized: false },
+        });
       default:
-        return redisClient;
+        return client;
     }
   },
   defaultJobOptions: {
@@ -47,32 +53,31 @@ export const summaryQueue = new Queue("summary-processing", {
   },
 });
 
-// Add error handlers with more detailed logging
+// Export client for health checks
+export const redisClient = client;
+
+// Add connection event handlers
+client.on("connect", () => {
+  console.log("Redis client connected successfully", {
+    timestamp: new Date().toISOString(),
+  });
+});
+
+client.on("error", (error) => {
+  console.error("Redis client error:", {
+    message: error.message,
+    stack: error.stack,
+    code: error.code,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Add queue error handlers
 summaryQueue.on("error", function (error) {
   console.error("Queue error:", {
     message: error.message,
     stack: error.stack,
     code: error.code,
-  });
-});
-
-summaryQueue.on("failed", function (job, error) {
-  console.error("Job failed:", {
-    jobId: job.id,
-    error: error.message,
-    stack: error.stack,
-  });
-});
-
-// Add connection status logging
-redisClient.on("connect", function () {
-  console.log("Redis client connected successfully");
-});
-
-redisClient.on("error", function (error) {
-  console.error("Redis client error:", {
-    message: error.message,
-    stack: error.stack,
-    code: error.code,
+    timestamp: new Date().toISOString(),
   });
 });

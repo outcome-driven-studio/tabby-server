@@ -11,9 +11,10 @@ primary_region = 'iad'
 
 [env]
   PORT = '3000'
-  UPSTASH_REDIS_URL = "redis://default:31bff025e9144f22a312d22c23c96c58@us1-engaged-mite-37890.upstash.io:37890"
+  REDIS_URL = "redis://default:AVMXAAIjcDFiY2Y1Y2UxODE4OTY0ZTM4OTVjMjY4ZTAzNWQ1ZWE4ZHAxMA@popular-malamute-21271.upstash.io:6379"
   REDIS_MAX_RETRIES = "3"
   REDIS_RETRY_DELAY = "1000"
+  NODE_ENV = "production"
 
 [http_service]
   internal_port = 3000
