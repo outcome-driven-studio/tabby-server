@@ -124,14 +124,28 @@ async function sendToSlack(content) {
 
 async function sendEmail(content) {
   try {
-    await sgMail.send({
+    const msg = {
       to: process.env.NOTIFICATION_EMAIL,
-      from: process.env.FROM_EMAIL,
+      from: {
+        email: process.env.FROM_EMAIL,
+        name: "Tabby Digest", // Adding a sender name can help deliverability
+      },
       subject: `Weekly Tab Digest - ${new Date().toLocaleDateString()}`,
       html: content,
-    });
+    };
+
+    const response = await sgMail.send(msg);
+    console.log("SendGrid response:", response[0].statusCode);
+
+    if (response[0].statusCode !== 202) {
+      throw new Error(`SendGrid returned status ${response[0].statusCode}`);
+    }
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("Error sending email:", {
+      status: error.code,
+      message: error.message,
+      response: error.response?.body,
+    });
     throw error;
   }
 }

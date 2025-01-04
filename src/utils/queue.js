@@ -1,6 +1,6 @@
 import Queue from "bull";
 
-const REDIS_URL = process.env.UPSTASH_REDIS_URL;
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
 
 export const summaryQueue = new Queue("summary-processing", REDIS_URL, {
   defaultJobOptions: {
