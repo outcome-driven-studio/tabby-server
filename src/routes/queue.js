@@ -7,14 +7,19 @@ const router = express.Router();
 // Get overall queue stats
 router.get("/stats", async (req, res) => {
   try {
+    // Check queue connection first
+    if (!summaryQueue.client.status === "ready") {
+      throw new Error("Queue is not connected to Redis");
+    }
+
     const [waiting, active, completed, failed, delayed, paused] =
       await Promise.all([
-        summaryQueue.getWaitingCount(),
-        summaryQueue.getActiveCount(),
-        summaryQueue.getCompletedCount(),
-        summaryQueue.getFailedCount(),
-        summaryQueue.getDelayedCount(),
-        summaryQueue.isPaused(),
+        summaryQueue.getWaitingCount().catch((e) => 0),
+        summaryQueue.getActiveCount().catch((e) => 0),
+        summaryQueue.getCompletedCount().catch((e) => 0),
+        summaryQueue.getFailedCount().catch((e) => 0),
+        summaryQueue.getDelayedCount().catch((e) => 0),
+        summaryQueue.isPaused().catch((e) => false),
       ]);
 
     return res.json({
@@ -28,15 +33,19 @@ router.get("/stats", async (req, res) => {
       status: {
         isPaused: paused,
         isActive: active > 0,
+        isConnected: summaryQueue.client.status === "ready",
       },
       name: summaryQueue.name,
     });
   } catch (error) {
     console.error("Error fetching queue stats:", error);
-    return res.status(500).json({
-      error: "Failed to fetch queue stats",
+    return res.status(503).json({
+      error: "Queue service unavailable",
       details:
         process.env.NODE_ENV === "development" ? error.message : undefined,
+      status: {
+        isConnected: false,
+      },
     });
   }
 });

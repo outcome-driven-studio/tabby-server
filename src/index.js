@@ -7,6 +7,7 @@ import { router as newsletterRouter } from "./routes/newsletter.js";
 import { router as authRouter } from "./routes/auth.js";
 import { router as preferencesRouter } from "./routes/preferences.js";
 import { router as queueRouter } from "./routes/queue.js";
+import { authMiddleware } from "./middleware/auth.js";
 
 const app = express();
 
@@ -27,10 +28,10 @@ app.get("/health", (req, res) => {
 
 // Routes
 app.use("/api/auth", authRouter);
-app.use("/api/preferences", preferencesRouter);
-app.use("/api/summaries", summaryRouter);
-app.use("/api/newsletter", newsletterRouter);
-app.use("/api/queue", queueRouter);
+app.use("/api/preferences", authMiddleware, preferencesRouter);
+app.use("/api/summaries", authMiddleware, summaryRouter);
+app.use("/api/newsletter", authMiddleware, newsletterRouter);
+app.use("/api/queue", authMiddleware, queueRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
