@@ -167,6 +167,46 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.post("/api/summaries", async (req, res) => {
+  try {
+    const { url, title, type, content, metadata } = req.body;
+
+    // Validate Google token from header
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "No auth token provided" });
+    }
+
+    // Create summary in database
+    const summary = await prisma.summary.create({
+      data: {
+        url,
+        title,
+        type,
+        content,
+        metadata,
+        status: "COMPLETED",
+      },
+    });
+
+    res.json(summary);
+  } catch (error) {
+    console.error("Error creating summary:", error);
+    res.status(500).json({ error: "Failed to create summary" });
+  }
+});
+
+router.get("/api/summaries/:id", async (req, res) => {
+  try {
+    const summary = await prisma.summary.findUnique({
+      where: { id: req.params.id },
+    });
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch summary" });
+  }
+});
+
 // Add an endpoint to get a specific summary
 router.get("/:id", async (req, res) => {
   try {

@@ -4,6 +4,8 @@ import cors from "cors";
 import prisma from "./db.js";
 import { router as summaryRouter } from "./routes/summaries.js";
 import { router as newsletterRouter } from "./routes/newsletter.js";
+import { router as authRouter } from "./routes/auth.js";
+import { router as preferencesRouter } from "./routes/preferences.js";
 
 const app = express();
 
@@ -23,8 +25,8 @@ app.get("/health", (req, res) => {
 });
 
 // Routes
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/preferences", require("./routes/preferences"));
+app.use("/api/auth", authRouter);
+app.use("/api/preferences", preferencesRouter);
 app.use("/api/summaries", summaryRouter);
 app.use("/api/newsletter", newsletterRouter);
 

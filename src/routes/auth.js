@@ -1,9 +1,8 @@
-const express = require("express");
-const router = express.Router();
-const { google } = require("googleapis");
-const { PrismaClient } = require("@prisma/client");
+import express from "express";
+import { google } from "googleapis";
+import prisma from "../db.js";
 
-const prisma = new PrismaClient();
+const router = express.Router();
 
 router.post("/google", async (req, res) => {
   try {
@@ -42,4 +41,4 @@ router.post("/google", async (req, res) => {
   }
 });
 
-module.exports = router;
+export { router };

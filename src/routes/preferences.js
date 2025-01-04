@@ -1,8 +1,7 @@
-const express = require("express");
-const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
+import express from "express";
+import prisma from "../db.js";
 
-const prisma = new PrismaClient();
+const router = express.Router();
 
 router.patch("/:userId", async (req, res) => {
   try {
@@ -31,4 +30,4 @@ router.patch("/:userId", async (req, res) => {
   }
 });
 
-module.exports = router;
+export { router };
