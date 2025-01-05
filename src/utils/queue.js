@@ -8,40 +8,8 @@ if (!REDIS_URL) {
   process.exit(1);
 }
 
-// Create a single Redis client instance
-const client = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: false,
-  retryStrategy(times) {
-    console.log(`Retry attempt ${times}`);
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-  tls: { rejectUnauthorized: false },
-});
-
-// Create Bull queue using the Redis client
-export const summaryQueue = new Queue("summary-processing", {
-  createClient: (type) => {
-    switch (type) {
-      case "client":
-        return client;
-      case "subscriber":
-        return new Redis(REDIS_URL, {
-          maxRetriesPerRequest: 3,
-          enableReadyCheck: false,
-          tls: { rejectUnauthorized: false },
-        });
-      case "bclient":
-        return new Redis(REDIS_URL, {
-          maxRetriesPerRequest: 3,
-          enableReadyCheck: false,
-          tls: { rejectUnauthorized: false },
-        });
-      default:
-        return client;
-    }
-  },
+// Create Bull queue with direct Redis URL
+export const summaryQueue = new Queue("summary-processing", REDIS_URL, {
   defaultJobOptions: {
     attempts: 3,
     backoff: {
@@ -51,19 +19,38 @@ export const summaryQueue = new Queue("summary-processing", {
     removeOnComplete: true,
     removeOnFail: false,
   },
+  redis: {
+    tls: { rejectUnauthorized: false },
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: false,
+    retryStrategy(times) {
+      console.log(`Retry attempt ${times}`);
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
+  },
 });
 
-// Export client for health checks
-export const redisClient = client;
+// Create a separate Redis client for health checks
+export const redisClient = new Redis(REDIS_URL, {
+  tls: { rejectUnauthorized: false },
+  maxRetriesPerRequest: 3,
+  enableReadyCheck: false,
+  retryStrategy(times) {
+    console.log(`Retry attempt ${times}`);
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
+});
 
 // Add connection event handlers
-client.on("connect", () => {
+redisClient.on("connect", () => {
   console.log("Redis client connected successfully", {
     timestamp: new Date().toISOString(),
   });
 });
 
-client.on("error", (error) => {
+redisClient.on("error", (error) => {
   console.error("Redis client error:", {
     message: error.message,
     stack: error.stack,

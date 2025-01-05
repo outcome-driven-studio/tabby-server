@@ -8,11 +8,9 @@ const router = express.Router();
 
 router.post("/generate", async (req, res) => {
   try {
-    await generateAndSendNewsletter();
-    return res.json({
-      success: true,
-      message: "Newsletter generated and sent successfully",
-    });
+    const userId = req.user.id;
+    const result = await generateAndSendNewsletter(userId);
+    return res.json(result);
   } catch (error) {
     console.error("Error generating newsletter:", error);
     return res.status(500).json({

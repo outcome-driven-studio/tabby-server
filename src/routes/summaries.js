@@ -1,7 +1,6 @@
 // src/routes/summaries.js
 import express from "express";
 import prisma from "../db.js";
-import { startProcessing } from "../workers/summaryWorker.js";
 import { classifyContent } from "../utils/contentClassifier.js";
 import { summaryQueue } from "../utils/queue.js";
 
@@ -9,70 +8,39 @@ const router = express.Router();
 
 router.post("/", async (req, res) => {
   try {
-    // Validate required fields
-    const { url, title, content } = req.body;
-    if (!url || !title || !content) {
-      return res.status(400).json({
-        error: "Missing required fields",
-        details: "url, title, and content are required",
-      });
-    }
+    const { content, metadata, userId } = req.body;
 
-    console.log("Received content for classification:", { url, title });
-
-    // First, classify the content
-    const contentType = await classifyContent({ url, title, content });
-    console.log("Content classified as:", contentType);
-
-    // Only process if content type is one we want to handle
-    if (
-      ["article", "tweet", "linkedin_post", "youtube_video"].includes(
-        contentType
-      )
-    ) {
-      const summary = await prisma.tabSummary.create({
-        data: {
-          url,
-          title,
-          type: contentType,
-          rawContent: content,
-          status: "PENDING",
-          summary: "", // Initialize with empty string
-          keyPoints: "", // Initialize with empty string
-          tags: [],
-          createdAt: new Date(),
-        },
-      });
-
-      // Trigger background processing
-      await startProcessing(summary.id);
-
-      return res.json({
-        id: summary.id,
+    // Create pending summary
+    const summary = await prisma.summary.create({
+      data: {
+        rawContent: content,
+        metadata,
         status: "PENDING",
-        type: contentType,
-        message: `Content identified as ${contentType}, processing started`,
-      });
-    }
+        userId,
+      },
+    });
 
-    return res.json({
-      status: "SKIPPED",
-      type: contentType,
-      message: "Content type not supported for processing",
-    });
+    // Add to processing queue
+    await summaryQueue.add(
+      { summaryId: summary.id },
+      {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 1000,
+        },
+      }
+    );
+
+    res.json(summary);
   } catch (error) {
-    console.error("Error processing content:", error);
-    return res.status(500).json({
-      error: "Failed to process content",
-      details:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
+    console.error("Error creating summary:", error);
+    res.status(500).json({ error: "Failed to create summary" });
   }
 });
 
 router.get("/status", async (req, res) => {
   try {
-    // Get queue status
     const [
       totalCount,
       pendingCount,
@@ -82,11 +50,11 @@ router.get("/status", async (req, res) => {
       queueCount,
       activeCount,
     ] = await Promise.all([
-      prisma.tabSummary.count(),
-      prisma.tabSummary.count({ where: { status: "PENDING" } }),
-      prisma.tabSummary.count({ where: { status: "PROCESSING" } }),
-      prisma.tabSummary.count({ where: { status: "COMPLETED" } }),
-      prisma.tabSummary.count({ where: { status: "FAILED" } }),
+      prisma.summary.count(),
+      prisma.summary.count({ where: { status: "PENDING" } }),
+      prisma.summary.count({ where: { status: "PROCESSING" } }),
+      prisma.summary.count({ where: { status: "COMPLETED" } }),
+      prisma.summary.count({ where: { status: "FAILED" } }),
       summaryQueue.getWaitingCount(),
       summaryQueue.getActiveCount(),
     ]);
@@ -136,7 +104,7 @@ router.get("/status", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const summaries = await prisma.tabSummary.findMany({
+    const summaries = await prisma.summary.findMany({
       where: {
         status: "COMPLETED",
       },
@@ -210,7 +178,7 @@ router.get("/api/summaries/:id", async (req, res) => {
 // Add an endpoint to get a specific summary
 router.get("/:id", async (req, res) => {
   try {
-    const summary = await prisma.tabSummary.findUnique({
+    const summary = await prisma.summary.findUnique({
       where: {
         id: req.params.id,
       },

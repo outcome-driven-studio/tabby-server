@@ -8,7 +8,7 @@ const router = express.Router();
 router.get("/stats", async (req, res) => {
   try {
     // Check queue connection first
-    if (!summaryQueue.client.status === "ready") {
+    if (summaryQueue.client && summaryQueue.client.status !== "ready") {
       throw new Error("Queue is not connected to Redis");
     }
 
@@ -33,7 +33,8 @@ router.get("/stats", async (req, res) => {
       status: {
         isPaused: paused,
         isActive: active > 0,
-        isConnected: summaryQueue.client.status === "ready",
+        isConnected:
+          summaryQueue.client && summaryQueue.client.status === "ready",
       },
       name: summaryQueue.name,
     });

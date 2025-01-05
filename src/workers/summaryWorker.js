@@ -3,9 +3,8 @@ import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { LLMChain } from "langchain/chains";
 import prisma from "../db.js";
+import { summaryQueue } from "../utils/queue.js";
 
-let processingQueue = [];
-let isProcessing = false;
 let llm = null;
 
 function initializeLLM() {
@@ -18,39 +17,24 @@ function initializeLLM() {
   }
 }
 
-export async function startProcessing(summaryId) {
-  console.log(`Adding summary ${summaryId} to processing queue`);
-  processingQueue.push(summaryId);
-  if (!isProcessing) {
-    processNext();
-  }
-}
-
-async function processNext() {
-  if (processingQueue.length === 0) {
-    isProcessing = false;
-    return;
-  }
-
-  isProcessing = true;
-  const summaryId = processingQueue.shift();
+// Process jobs using Bull queue
+summaryQueue.process(async (job) => {
+  const { summaryId } = job.data;
 
   try {
     console.log(`Processing summary ${summaryId}`);
 
     // Get the summary data
-    const summary = await prisma.tabSummary.findUnique({
+    const summary = await prisma.summary.findUnique({
       where: { id: summaryId },
     });
 
     if (!summary || summary.status !== "PENDING") {
-      console.log(`Skipping summary ${summaryId}: Invalid status or not found`);
-      processNext();
-      return;
+      throw new Error(`Invalid summary status or not found: ${summaryId}`);
     }
 
     // Mark as processing
-    await prisma.tabSummary.update({
+    await prisma.summary.update({
       where: { id: summaryId },
       data: { status: "PROCESSING" },
     });
@@ -66,7 +50,7 @@ async function processNext() {
     ]);
 
     // Update the record
-    await prisma.tabSummary.update({
+    await prisma.summary.update({
       where: { id: summaryId },
       data: {
         summary: summaryText,
@@ -78,22 +62,23 @@ async function processNext() {
     });
 
     console.log(`Successfully processed summary ${summaryId}`);
+    return { summaryId, status: "COMPLETED" };
   } catch (error) {
     console.error(`Error processing summary ${summaryId}:`, error);
 
     // Mark as failed
-    await prisma.tabSummary.update({
+    await prisma.summary.update({
       where: { id: summaryId },
       data: {
         status: "FAILED",
         processedAt: new Date(),
+        error: error.message,
       },
     });
-  }
 
-  // Process next item
-  processNext();
-}
+    throw error; // Rethrow to let Bull handle the failure
+  }
+});
 
 async function generateSummary(content, type) {
   const templates = {
@@ -169,4 +154,14 @@ async function generateTags(content) {
 
   const result = await chain.call({ content });
   return result.text.split(",").map((tag) => tag.trim());
+}
+
+export function startProcessing() {
+  // Initialize LLM
+  initializeLLM();
+
+  console.log("Starting summary processing worker...");
+
+  // The queue processing logic is already set up via summaryQueue.process()
+  return summaryQueue;
 }

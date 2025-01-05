@@ -13,53 +13,67 @@ enum Status {
   PROCESSING
   COMPLETED
   FAILED
+  SKIPPED
 }
 
-model TabSummary {
-  id           String   @id @default(cuid())
-  url          String
-  title        String
-  type         String
-  rawContent   String   @db.Text
-  summary      String?  @db.Text
-  keyPoints    String?  @db.Text
-  tags         String[]
-  status       Status   @default(PENDING)
-  processedAt  DateTime?
-  createdAt    DateTime @default(now())
+model Summary {
+  id          String    @id @default(cuid())
+  url         String?   @unique
+  title       String?
+  type        String?
+  rawContent  String    @db.Text
+  summary     String?   @db.Text
+  keyPoints   String[]  @default([])
+  tags        String[]  @default([])
+  metadata    Json?
+  status      Status    @default(PENDING)
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([createdAt])
   @@index([status])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  picture   String?
-  lastLogin DateTime @default(now())
-  preferences UserPreferences?
-  summaries   Summary[]
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String?
+  picture        String?
+  lastLogin      DateTime        @default(now())
+  preferences    UserPreferences?
+  slackWorkspace SlackWorkspace?
+  summaries      Summary[]
+
+  @@index([email])
 }
 
 model UserPreferences {
   id                 String   @id @default(cuid())
   userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id])
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   contentTypes      String[]
   automationEnabled Boolean  @default(false)
   automationFrequency Int    @default(1)
+  quietHours       Json?    // Store as { enabled: boolean, start: number, end: number }
+
+  @@index([userId])
 }
 
-model Summary {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  url       String   @unique
-  title     String
-  type      String
-  content   String   @db.Text
-  keyPoints String?  @db.Text
-  tags      String[]
-  createdAt DateTime @default(now())
+model SlackWorkspace {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken String
+  teamId      String
+  teamName    String
+  webhookUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([teamId])
+  @@index([userId])
 }
