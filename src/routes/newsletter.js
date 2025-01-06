@@ -23,7 +23,7 @@ router.post("/generate", async (req, res) => {
 
 router.get("/preview", async (req, res) => {
   try {
-    const summaries = await prisma.tabSummary.findMany({
+    const summaries = await prisma.summary.findMany({
       where: {
         status: "COMPLETED",
       },

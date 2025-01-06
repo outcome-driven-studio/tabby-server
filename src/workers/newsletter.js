@@ -12,7 +12,7 @@ async function generateAndSendNewsletter(userId) {
     weekAgo.setDate(weekAgo.getDate() - 7);
 
     const summaries = await prisma.$transaction(async (tx) => {
-      return tx.tabSummary.findMany({
+      return tx.summary.findMany({
         where: {
           userId,
           status: "COMPLETED",
@@ -142,4 +142,5 @@ async function sendEmail(content) {
   }
 }
 
-export { generateAndSendNewsletter };
+export { generateAndSendNewsletter, formatNewsletter };
+export { formatSlackContent, formatEmailContent };
